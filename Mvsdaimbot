@@ -1,0 +1,141 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local aiming = false
+local toggle = true
+local highlights = {}
+local interfaceVisible = true
+local dragging = false
+local dragOffset
+
+local gui = Instance.new("ScreenGui")
+gui.ResetOnSpawn = false
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 200, 0, 30)
+frame.Position = UDim2.new(0, 10, 0, 10)
+frame.BackgroundColor3 = Color3.new(0, 0, 0)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = false
+frame.Parent = gui
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, 0, 1, 0)
+label.Position = UDim2.new(0, 0, 0, 0)
+label.Text = "Aimbot: ON"
+label.BackgroundTransparency = 1
+label.TextColor3 = Color3.new(1, 1, 1)
+label.TextScaled = true
+label.Parent = frame
+
+frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragOffset = input.Position - frame.Position
+	end
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = false
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		frame.Position = UDim2.new(0, input.Position.X - dragOffset.X.Offset, 0, input.Position.Y - dragOffset.Y.Offset)
+	end
+end)
+
+local function getClosestEnemy()
+	local closest = nil
+	local dist = math.huge
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer and p.Team ~= LocalPlayer.Team and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+			local pos, vis = Camera:WorldToViewportPoint(p.Character.HumanoidRootPart.Position)
+			if vis then
+				local d = (Vector2.new(pos.X, pos.Y) - UIS:GetMouseLocation()).Magnitude
+				if d < dist then
+					dist = d
+					closest = p
+				end
+			end
+		end
+	end
+	return closest
+end
+
+RunService.RenderStepped:Connect(function()
+	if aiming and toggle then
+		local t = getClosestEnemy()
+		if t and t.Character and t.Character:FindFirstChild("HumanoidRootPart") then
+			Camera.CFrame = CFrame.new(Camera.CFrame.Position, t.Character.HumanoidRootPart.Position)
+		end
+	end
+end)
+
+UIS.InputBegan:Connect(function(input, g)
+	if input.KeyCode == Enum.KeyCode.E then
+		aiming = true
+	elseif input.KeyCode == Enum.KeyCode.L then
+		toggle = not toggle
+		label.Text = toggle and "Aimbot: ON" or "Aimbot: OFF"
+	elseif input.KeyCode == Enum.KeyCode.K then
+		interfaceVisible = not interfaceVisible
+		gui.Enabled = interfaceVisible
+	end
+end)
+
+UIS.InputEnded:Connect(function(input, g)
+	if input.KeyCode == Enum.KeyCode.E then
+		aiming = false
+	end
+end)
+
+local function createESP(p)
+	if highlights[p] or p.Team == LocalPlayer.Team then return end
+	local h = Instance.new("Highlight")
+	h.Adornee = p.Character
+	h.FillColor = Color3.fromRGB(255, 0, 0)
+	h.OutlineColor = Color3.fromRGB(255, 255, 255)
+	h.FillTransparency = 0.5
+	h.OutlineTransparency = 0
+	h.Name = ""
+	h.Parent = game.CoreGui
+	highlights[p] = h
+end
+
+local function removeESP(p)
+	if highlights[p] then
+		highlights[p]:Destroy()
+		highlights[p] = nil
+	end
+end
+
+for _, p in ipairs(Players:GetPlayers()) do
+	if p ~= LocalPlayer then
+		p.CharacterAdded:Connect(function()
+			task.wait(1)
+			createESP(p)
+		end)
+		if p.Character then
+			createESP(p)
+		end
+	end
+end
+
+Players.PlayerAdded:Connect(function(p)
+	p.CharacterAdded:Connect(function()
+		task.wait(1)
+		createESP(p)
+	end)
+end)
+
+Players.PlayerRemoving:Connect(function(p)
+	removeESP(p)
+end)
